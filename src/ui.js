@@ -1,6 +1,5 @@
 import { eventBus } from './eventBus.js';
 
-// Riferimenti alle schermate principali
 const loaderView = document.getElementById('loader-view');
 const pathwayView = document.getElementById('pathway-view');
 const learningView = document.getElementById('learning-view');
@@ -8,13 +7,11 @@ const learningView = document.getElementById('learning-view');
 let currentCourse = null;
 let currentProgress = null;
 
-// Funzione per cambiare la vista attiva
 function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(viewId).classList.add('active');
 }
 
-// --- RENDERING DEL PERCORSO ---
 function renderPathway() {
     const { course, progress } = { course: currentCourse, progress: currentProgress };
     
@@ -43,7 +40,6 @@ function renderPathway() {
     pathwayView.querySelectorAll('.tile').forEach(tileElement => {
         tileElement.addEventListener('click', () => {
             const tileId = tileElement.dataset.tileId;
-            // NUOVO EVENTO: iniziamo la sessione invece di completarla
             eventBus.emit('startLearningSession', { tileId });
         });
     });
@@ -51,35 +47,46 @@ function renderPathway() {
     showView('pathway-view');
 }
 
-// --- RENDERING DELLA SESSIONE DI APPRENDIMENTO ---
 function renderLearningSession(tileId) {
     const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
-    if (!tile) return;
+    if (!tile || !tile.orbs || tile.orbs.length === 0) {
+        // Se il tile non ha orb, lo consideriamo vuoto e lo completiamo subito.
+        eventBus.emit('tileCompleted', { tileId });
+        renderPathway();
+        return;
+    }
 
+    // Indici per navigare la struttura gerarchica
+    let orbIndex = 0;
     let contentIndex = 0;
 
     const renderCurrentContent = () => {
-        if (contentIndex >= tile.contents.length) {
-            // Sessione finita, ora emettiamo l'evento di completamento!
+        // Se abbiamo finito i contenuti dell'orb corrente, passiamo al prossimo orb
+        if (contentIndex >= tile.orbs[orbIndex].contents.length) {
+            contentIndex = 0;
+            orbIndex++;
+        }
+
+        // Se abbiamo finito tutti gli orb, la sessione è finita
+        if (orbIndex >= tile.orbs.length) {
             eventBus.emit('tileCompleted', { tileId });
-            renderPathway(); // Torna al percorso
+            renderPathway();
             return;
         }
 
-        const content = tile.contents[contentIndex];
+        const currentOrb = tile.orbs[orbIndex];
+        const currentContent = currentOrb.contents[contentIndex];
         let contentHtml = '';
 
-        if (content.type === 'lesson') {
+        if (currentContent.type === 'lesson') {
             contentHtml = `
-                <h3>${content.title || 'Lezione'}</h3>
-                <p>${content.text}</p>
+                <p>${currentContent.text}</p>
                 <button id="next-content-btn">Ho capito, continua</button>
             `;
-        } else if (content.type === 'flashcard') {
+        } else if (currentContent.type === 'flashcard') {
             contentHtml = `
-                <h3>Flashcard</h3>
-                <p><strong>Domanda:</strong> ${content.question}</p>
-                <p style="display:none;"><strong>Risposta:</strong> ${content.answer}</p>
+                <p><strong>Domanda:</strong> ${currentContent.question}</p>
+                <p id="flashcard-answer" style="display:none;"><strong>Risposta:</strong> ${currentContent.answer}</p>
                 <button id="show-answer-btn">Mostra risposta</button>
                 <button id="next-content-btn" style="display:none;">Continua</button>
             `;
@@ -89,17 +96,17 @@ function renderLearningSession(tileId) {
             <div class="card">
                 <button class="back-button">← Torna al percorso</button>
                 <h2>${tile.title}</h2>
+                <h3 style="font-weight: 600; color: #3b82f6;">${currentOrb.title}</h3>
                 <div id="learning-content">${contentHtml}</div>
             </div>
         `;
 
-        // Aggiungi event listener ai nuovi elementi
         learningView.querySelector('.back-button').addEventListener('click', renderPathway);
         
         const nextButton = learningView.querySelector('#next-content-btn');
         if (nextButton) {
             nextButton.addEventListener('click', () => {
-                contentIndex++;
+                contentIndex++; // Andiamo al prossimo contenuto
                 renderCurrentContent();
             });
         }
@@ -107,7 +114,7 @@ function renderLearningSession(tileId) {
         const showAnswerButton = learningView.querySelector('#show-answer-btn');
         if (showAnswerButton) {
             showAnswerButton.addEventListener('click', () => {
-                learningView.querySelector('p[style*="display:none"]').style.display = 'block';
+                learningView.querySelector('#flashcard-answer').style.display = 'block';
                 showAnswerButton.style.display = 'none';
                 nextButton.style.display = 'inline-block';
             });
@@ -118,32 +125,26 @@ function renderLearningSession(tileId) {
     showView('learning-view');
 }
 
+// --- GESTIONE EVENTI GLOBALI (INVARIATA) ---
 
-// --- GESTIONE EVENTI GLOBALI ---
-
-// 1. Il corso è stato caricato e i progressi sono pronti
 eventBus.on('progressLoaded', (data) => {
     currentCourse = data.course;
     currentProgress = data.progress;
     renderPathway();
 });
 
-// 2. L'utente ha cliccato su un tile, apriamo la lezione
 eventBus.on('startLearningSession', ({ tileId }) => {
     renderLearningSession(tileId);
 });
 
-// 3. La lezione è finita, aggiorniamo lo stato
 eventBus.on('tileCompleted', ({ tileId }) => {
     if (currentProgress && !currentProgress.completedTiles.has(tileId)) {
-        // Usiamo lo stesso evento di prima per aggiornare i progressi
-        // Ma questa volta viene chiamato solo alla fine di una lezione
         eventBus.emit('updateProgress', { tileId });
     }
 });
 
-// 4. Lo stato è stato aggiornato nel core, rinfreschiamo la UI del percorso
 eventBus.on('progressUpdated', (newProgress) => {
     currentProgress = newProgress;
-    // Non facciamo nulla qui, perché torniamo al percorso che si ri-renderizza da solo
+    // Quando i progressi vengono aggiornati, non facciamo nulla attivamente
+    // perché la UI si aggiorna solo quando torniamo al percorso.
 });
