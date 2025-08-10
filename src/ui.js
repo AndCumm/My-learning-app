@@ -17,7 +17,9 @@ function renderPathway() {
     
     const totalTiles = course.pathway.tiles.length;
     const completedCount = progress.completedTiles.size;
-    const percentage = totalTiles > 0 ? Math.round((completedCount / totalTiles) * 100) : 0;
+    // FIX: Assicuriamoci che la percentuale non superi mai il 100%
+    const rawPercentage = totalTiles > 0 ? (completedCount / totalTiles) * 100 : 0;
+    const percentage = Math.min(100, Math.round(rawPercentage));
 
     let tilesHtml = course.pathway.tiles.map(tile => {
         const isCompleted = progress.completedTiles.has(tile.id);
@@ -33,6 +35,9 @@ function renderPathway() {
             <div class="progress-bar">
                 <div class="progress" style="width: ${percentage}%"></div>
             </div>
+            <div style="margin: 1rem 0;">
+                <button id="reset-progress-btn" style="background-color: #dc2626; font-size: 0.875rem; padding: 0.5rem 1rem;">🗑️ Reset Progresso</button>
+            </div>
             <div id="tiles-container">${tilesHtml}</div>
         </div>
     `;
@@ -44,14 +49,24 @@ function renderPathway() {
         });
     });
     
+    // Aggiungi listener per il pulsante reset
+    const resetButton = pathwayView.querySelector('#reset-progress-btn');
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            if (confirm('Sei sicuro di voler resettare tutto il progresso di questo corso? Questa azione non può essere annullata.')) {
+                eventBus.emit('resetProgress');
+            }
+        });
+    }
+    
     showView('pathway-view');
 }
 
 function renderLearningSession(tileId) {
     const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
     if (!tile || !tile.orbs || tile.orbs.length === 0) {
-        // Se il tile non ha orb, lo consideriamo vuoto e lo completiamo subito.
-        eventBus.emit('tileCompleted', { tileId });
+        // FIX: Usa direttamente updateProgress invece di tileCompleted
+        eventBus.emit('updateProgress', { tileId });
         renderPathway();
         return;
     }
@@ -69,7 +84,8 @@ function renderLearningSession(tileId) {
 
         // Se abbiamo finito tutti gli orb, la sessione è finita
         if (orbIndex >= tile.orbs.length) {
-            eventBus.emit('tileCompleted', { tileId });
+            // FIX: Usa direttamente updateProgress invece di tileCompleted
+            eventBus.emit('updateProgress', { tileId });
             renderPathway();
             return;
         }
@@ -125,7 +141,7 @@ function renderLearningSession(tileId) {
     showView('learning-view');
 }
 
-// --- GESTIONE EVENTI GLOBALI (INVARIATA) ---
+// --- GESTIONE EVENTI GLOBALI ---
 
 eventBus.on('progressLoaded', (data) => {
     currentCourse = data.course;
@@ -137,14 +153,17 @@ eventBus.on('startLearningSession', ({ tileId }) => {
     renderLearningSession(tileId);
 });
 
-eventBus.on('tileCompleted', ({ tileId }) => {
-    if (currentProgress && !currentProgress.completedTiles.has(tileId)) {
-        eventBus.emit('updateProgress', { tileId });
-    }
-});
+// FIX: RIMOSSO completamente il listener tileCompleted che causava la doppia emissione
+// eventBus.on('tileCompleted', ({ tileId }) => {
+//     if (currentProgress && !currentProgress.completedTiles.has(tileId)) {
+//         eventBus.emit('updateProgress', { tileId });
+//     }
+// });
 
 eventBus.on('progressUpdated', (newProgress) => {
     currentProgress = newProgress;
-    // Quando i progressi vengono aggiornati, non facciamo nulla attivamente
-    // perché la UI si aggiorna solo quando torniamo al percorso.
+    // Ri-renderizza la pathway quando il progresso viene aggiornato
+    if (currentCourse) {
+        renderPathway();
+    }
 });
