@@ -40,11 +40,9 @@ function renderPathway() {
         </div>
     `;
 
-    // FIX: Colleghiamo correttamente i click ai tile
     pathwayView.querySelectorAll('.tile').forEach(tileElement => {
         const tileId = tileElement.dataset.tileId;
         tileElement.addEventListener('click', () => {
-            alert(`Cliccato tile: ${tileId} - Emetto evento...`);
             eventBus.emit('startLearningSession', { tileId });
         });
     });
@@ -52,7 +50,7 @@ function renderPathway() {
     const resetButton = pathwayView.querySelector('#reset-progress-btn');
     if (resetButton) {
         resetButton.addEventListener('click', () => {
-            if (confirm('Reset progresso?')) {
+            if (confirm('Sei sicuro di voler resettare tutto il progresso di questo corso? Questa azione non può essere annullata.')) {
                 eventBus.emit('resetProgress');
             }
         });
@@ -62,62 +60,50 @@ function renderPathway() {
 }
 
 function renderLearningSession(tileId) {
-    alert(`Avvio sessione per tile: ${tileId}`);
-    
     const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
     if (!tile) {
-        alert(`Errore: tile ${tileId} non trovato!`);
+        console.error(`Tile ${tileId} non trovato`);
         return;
     }
     
     if (!tile.orbs || tile.orbs.length === 0) {
-        alert(`Tile ${tileId} vuoto, lo completo subito`);
+        // Tile vuoto, completa subito
         eventBus.emit('updateProgress', { tileId });
         renderPathway();
         return;
     }
-
-    alert(`Tile ha ${tile.orbs.length} orbs, avvio contenuti...`);
 
     // Indici per navigare la struttura gerarchica
     let orbIndex = 0;
     let contentIndex = 0;
 
     const renderCurrentContent = () => {
-        alert(`DEBUG: orbIndex=${orbIndex}, contentIndex=${contentIndex}`);
-        
         // Se abbiamo finito i contenuti dell'orb corrente, passiamo al prossimo orb
         if (contentIndex >= tile.orbs[orbIndex].contents.length) {
-            alert(`DEBUG: Finiti contenuti orb ${orbIndex}, passo al prossimo`);
             contentIndex = 0;
             orbIndex++;
         }
 
         // Se abbiamo finito tutti gli orb, la sessione è finita
         if (orbIndex >= tile.orbs.length) {
-            alert(`Completato tile: ${tileId}`);
             eventBus.emit('updateProgress', { tileId });
             renderPathway();
             return;
         }
 
         const currentOrb = tile.orbs[orbIndex];
-        alert(`DEBUG: currentOrb = ${JSON.stringify(currentOrb)}`);
-        alert(`DEBUG: currentOrb.contents = ${JSON.stringify(currentOrb.contents)}`);
-        alert(`DEBUG: currentOrb.contents.length = ${currentOrb.contents ? currentOrb.contents.length : 'undefined'}`);
         
+        // Se l'orb corrente non ha contenuti, passa al prossimo
         if (!currentOrb.contents || currentOrb.contents.length === 0) {
-            alert(`DEBUG: Orb ${orbIndex} non ha contenuti!`);
-            orbIndex++; // Salta questo orb vuoto
-            renderCurrentContent(); // Riprova con il prossimo
+            orbIndex++;
+            renderCurrentContent();
             return;
         }
         
         const currentContent = currentOrb.contents[contentIndex];
-        alert(`DEBUG: currentContent = ${JSON.stringify(currentContent)}`);
         
         if (!currentContent) {
-            alert(`DEBUG: ERRORE - currentContent è undefined!`);
+            console.error('Contenuto non trovato');
             return;
         }
         
@@ -170,22 +156,19 @@ function renderLearningSession(tileId) {
     showView('learning-view');
 }
 
-// --- GESTIONE EVENTI GLOBALI - FIX: Aggiunti tutti i listener necessari ---
+// --- GESTIONE EVENTI GLOBALI ---
 
 eventBus.on('progressLoaded', (data) => {
-    alert('Progress loaded ricevuto!');
     currentCourse = data.course;
     currentProgress = data.progress;
     renderPathway();
 });
 
 eventBus.on('startLearningSession', ({ tileId }) => {
-    alert(`Evento startLearningSession ricevuto per: ${tileId}`);
     renderLearningSession(tileId);
 });
 
 eventBus.on('progressUpdated', (newProgress) => {
-    alert('Progress updated ricevuto!');
     currentProgress = newProgress;
     if (currentCourse) {
         renderPathway();
