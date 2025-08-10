@@ -20,6 +20,7 @@ export function parseXML(xmlString) {
     
     const orbNodes = tileNode.querySelectorAll("ORB");
 
+    // NOTA: "orbs" ora è un array di oggetti, ognuno con un titolo e i suoi contenuti.
     const orbs = Array.from(orbNodes).map((orbNode, orbIndex) => {
       const orbTitle = orbNode.querySelector("title")?.textContent.trim() || `Lezione ${orbIndex + 1}`;
       
@@ -36,12 +37,11 @@ export function parseXML(xmlString) {
         }
       });
       
-      // Ho notato che in ui.js ho usato tile.contents, quindi meglio chiamarlo così
-      return { title: orbTitle, contents };
+      return { title: orbTitle, contents: contents };
     });
     
-    // Assegnamo un ID univoco e passiamo gli "orbs" (che ora chiamo "contents")
-    return { id: `tile-${tileIndex}`, title: tileTitle, contents: orbs.flatMap(o => o.contents) };
+    // Il TILE ora contiene un array di "orbs", non un array "contents" appiattito.
+    return { id: `tile-${tileIndex}`, title: tileTitle, orbs: orbs };
   });
 
   return {
