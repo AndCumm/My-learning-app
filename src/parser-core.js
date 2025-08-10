@@ -2,41 +2,32 @@ export function parseXML(xmlString) {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
-  if (xmlDoc.getElementsByTagName("parsererror").length) {
+  if (xmlDoc.querySelector("parsererror")) {
     throw new Error("Errore di parsing XML: il formato del file non è valido.");
   }
 
-  const courseNode = xmlDoc.getElementsByTagName("*")[0];
-  if (!courseNode) {
-    throw new Error("Nessun nodo root trovato nel file XML.");
-  }
-
-  const courseTitle = courseNode.getAttribute("title") || "Corso senza titolo";
-
-  const pathwayNode = Array.from(courseNode.getElementsByTagName("*"))
-    .find(n => n.tagName.toLowerCase() === "pathway");
-
+  const pathwayNode = xmlDoc.querySelector("pathway");
   if (!pathwayNode) {
     throw new Error("Nessun tag <pathway> trovato all'interno del corso.");
   }
 
-  const tileNodes = Array.from(pathwayNode.getElementsByTagName("*"))
-    .filter(n => n.tagName.toLowerCase() === "tile");
+  const courseTitle = pathwayNode.getAttribute("title") || "Corso senza titolo";
+  
+  const tileNodes = pathwayNode.querySelectorAll("TILE");
 
-  const tiles = tileNodes.map((tileNode, tileIndex) => {
-    const tileTitleNode = tileNode.querySelector("title");
-    const tileTitle = tileTitleNode ? tileTitleNode.textContent.trim() : `Capitolo ${tileIndex + 1}`;
+  const tiles = Array.from(tileNodes).map((tileNode, tileIndex) => {
+    const tileTitle = tileNode.querySelector("title")?.textContent.trim() || `Capitolo ${tileIndex + 1}`;
     
-    const orbNodes = Array.from(tileNode.getElementsByTagName("*"))
-      .filter(n => n.tagName.toLowerCase() === "orb");
+    const orbNodes = tileNode.querySelectorAll("ORB");
 
-    const orbs = orbNodes.map((orbNode, orbIndex) => {
-      const orbTitleNode = orbNode.querySelector("title");
-      const orbTitle = orbTitleNode ? orbTitleNode.textContent.trim() : `Lezione ${orbIndex + 1}`;
+    const orbs = Array.from(orbNodes).map((orbNode, orbIndex) => {
+      const orbTitle = orbNode.querySelector("title")?.textContent.trim() || `Lezione ${orbIndex + 1}`;
+      
       const contents = [];
       orbNode.querySelectorAll("lesson").forEach(lessonNode => {
         contents.push({ type: "lesson", text: lessonNode.textContent.trim() });
       });
+      
       orbNode.querySelectorAll("flashcard").forEach(fcNode => {
         const q = fcNode.querySelector("question")?.textContent.trim();
         const a = fcNode.querySelector("answer")?.textContent.trim();
@@ -44,9 +35,13 @@ export function parseXML(xmlString) {
           contents.push({ type: "flashcard", question: q, answer: a });
         }
       });
+      
+      // Ho notato che in ui.js ho usato tile.contents, quindi meglio chiamarlo così
       return { title: orbTitle, contents };
     });
-    return { title: tileTitle, orbs };
+    
+    // Assegnamo un ID univoco e passiamo gli "orbs" (che ora chiamo "contents")
+    return { id: `tile-${tileIndex}`, title: tileTitle, contents: orbs.flatMap(o => o.contents) };
   });
 
   return {
