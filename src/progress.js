@@ -13,11 +13,33 @@ eventBus.on('courseLoaded', course => {
 });
 
 // All'evento 'updateProgress', aggiorna lo stato e salva
-// NOTA: l'evento è stato rinominato da 'tileCompleted' a 'updateProgress'
 eventBus.on('updateProgress', ({ tileId }) => {
   if (currentProgress) {
-    currentProgress.completedTiles.add(tileId);
-    saveProgress(currentCourseTitle, currentProgress);
+    // FIX: Controlliamo se il tile è già completato prima di procedere
+    const wasAlreadyCompleted = currentProgress.completedTiles.has(tileId);
+    
+    if (!wasAlreadyCompleted) {
+      currentProgress.completedTiles.add(tileId);
+      saveProgress(currentCourseTitle, currentProgress);
+      console.log(`Tile completato: ${tileId}. Totale completati: ${currentProgress.completedTiles.size}`);
+      eventBus.emit('progressUpdated', currentProgress);
+    } else {
+      console.log(`Tile ${tileId} già completato, salto l'aggiornamento.`);
+    }
+  }
+});
+
+// Nuovo: Gestione del reset del progresso
+eventBus.on('resetProgress', () => {
+  if (currentCourseTitle) {
+    // Rimuovi dal localStorage
+    const key = `progress_${currentCourseTitle}`;
+    localStorage.removeItem(key);
+    
+    // Reset dello stato in memoria
+    currentProgress = createEmptyProgress();
+    
+    console.log(`Progresso resettato per: ${currentCourseTitle}`);
     eventBus.emit('progressUpdated', currentProgress);
   }
 });
