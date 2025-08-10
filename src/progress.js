@@ -29,7 +29,7 @@ eventBus.on('updateProgress', ({ tileId }) => {
   }
 });
 
-// Nuovo: Gestione del reset del progresso
+// Gestione del reset del progresso
 eventBus.on('resetProgress', () => {
   if (currentCourseTitle) {
     // Rimuovi dal localStorage
