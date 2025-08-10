@@ -144,10 +144,19 @@ function toggleTileDropdown(tileId) {
     } else {
         openTiles.add(tileId);
     }
-    
-    // Re-render solo il contenuto necessario per un'animazione fluida
+
+    // Aggiungi questo pezzo per lo scroll automatico
+    const container = pathwayView.querySelector(`.tile-container[data-tile-id="${tileId}"]`);
+    if (container) {
+        // Un piccolo timeout per dare tempo al CSS di iniziare l'animazione
+        setTimeout(() => {
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+    }
+
     updateTileDropdowns();
 }
+
 
 function updateTileDropdowns() {
     const containers = pathwayView.querySelectorAll('.tile-container');
