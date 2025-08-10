@@ -103,6 +103,8 @@ function renderLearningSession(tileId) {
 
         const currentOrb = tile.orbs[orbIndex];
         alert(`DEBUG: currentOrb = ${JSON.stringify(currentOrb)}`);
+        alert(`DEBUG: currentOrb.contents = ${JSON.stringify(currentOrb.contents)}`);
+        alert(`DEBUG: currentOrb.contents.length = ${currentOrb.contents ? currentOrb.contents.length : 'undefined'}`);
         
         if (!currentOrb.contents || currentOrb.contents.length === 0) {
             alert(`DEBUG: Orb ${orbIndex} non ha contenuti!`);
