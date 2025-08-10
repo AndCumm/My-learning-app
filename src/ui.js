@@ -2,11 +2,11 @@ import { eventBus } from './eventBus.js';
 
 const loaderView = document.getElementById('loader-view');
 const pathwayView = document.getElementById('pathway-view');
-const orbsView = document.getElementById('orbs-view'); // Nuova view per gli orb
 const learningView = document.getElementById('learning-view');
 
 let currentCourse = null;
 let currentProgress = null;
+let openTiles = new Set(); // Tiene traccia di quali tile sono aperti
 
 function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -22,32 +22,110 @@ function renderPathway() {
 
     let tilesHtml = course.pathway.tiles.map(tile => {
         const isCompleted = progress.completedTiles.has(tile.id);
-        return `<div class="tile ${isCompleted ? 'completed' : ''}" data-tile-id="${tile.id}">
-                  ${tile.title} ${isCompleted ? '✅' : ''}
-                </div>`;
+        const isOpen = openTiles.has(tile.id);
+        
+        // Genera gli orb per questo tile se è aperto
+        let orbsHtml = '';
+        if (isOpen) {
+            orbsHtml = tile.orbs.map((orb, orbIndex) => {
+                const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
+                const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
+                const totalContent = orb.contents.length;
+                
+                let contentIndicators = '';
+                if (lessonCount > 0) {
+                    contentIndicators += `<span class="content-badge lesson">📖 ${lessonCount}</span>`;
+                }
+                if (flashcardCount > 0) {
+                    contentIndicators += `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>`;
+                }
+                
+                return `
+                    <div class="orb-item" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
+                        <div class="orb-content">
+                            <div class="orb-title">${orb.title}</div>
+                            <div class="orb-indicators">
+                                ${contentIndicators}
+                                <span class="total-badge">${totalContent} elementi</span>
+                            </div>
+                        </div>
+                        <div class="orb-arrow">▶</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        return `
+            <div class="tile-container ${isCompleted ? 'completed' : ''}" data-tile-id="${tile.id}">
+                <div class="tile-header ${isOpen ? 'open' : ''}">
+                    <div class="tile-info">
+                        <div class="tile-title">${tile.title}</div>
+                        <div class="tile-meta">
+                            <span class="orb-count">${tile.orbs.length} moduli</span>
+                            ${isCompleted ? '<span class="completion-badge">✅ Completato</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="tile-chevron ${isOpen ? 'rotated' : ''}">▼</div>
+                </div>
+                <div class="orbs-dropdown ${isOpen ? 'open' : ''}">
+                    <div class="orbs-content">
+                        ${orbsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
     }).join('');
 
     pathwayView.innerHTML = `
-        <div class="card">
-            <h2>${course.title}</h2>
-            <p>Completamento: <span>${percentage}%</span></p>
-            <div class="progress-bar">
-                <div class="progress" style="width: ${percentage}%"></div>
+        <div class="pathway-card">
+            <div class="course-header">
+                <h2 class="course-title">${course.title}</h2>
+                <div class="course-stats">
+                    <div class="progress-section">
+                        <div class="progress-text">Completamento: <span class="progress-value">${percentage}%</span></div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="reset-progress-btn" class="reset-btn">
+                            <span class="btn-icon">🗑️</span>
+                            <span class="btn-text">Reset Progresso</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div style="margin: 1rem 0;">
-                <button id="reset-progress-btn" style="background-color: #dc2626; font-size: 0.875rem; padding: 0.5rem 1rem;">🗑️ Reset Progresso</button>
+            <div class="tiles-container">
+                ${tilesHtml}
             </div>
-            <div id="tiles-container">${tilesHtml}</div>
         </div>
     `;
 
-    pathwayView.querySelectorAll('.tile').forEach(tileElement => {
-        const tileId = tileElement.dataset.tileId;
-        tileElement.addEventListener('click', () => {
-            eventBus.emit('showTileOrbs', { tileId });
+    // Event listeners per i tile headers (toggle dropdown)
+    pathwayView.querySelectorAll('.tile-header').forEach(tileHeader => {
+        const container = tileHeader.closest('.tile-container');
+        const tileId = container.dataset.tileId;
+        
+        tileHeader.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTileDropdown(tileId);
+        });
+    });
+
+    // Event listeners per gli orb
+    pathwayView.querySelectorAll('.orb-item').forEach(orbElement => {
+        const tileId = orbElement.dataset.tileId;
+        const orbIndex = parseInt(orbElement.dataset.orbIndex);
+        
+        orbElement.addEventListener('click', (e) => {
+            e.stopPropagation();
+            eventBus.emit('startLearningSession', { tileId, orbIndex });
         });
     });
     
+    // Event listener per il reset
     const resetButton = pathwayView.querySelector('#reset-progress-btn');
     if (resetButton) {
         resetButton.addEventListener('click', () => {
@@ -60,78 +138,82 @@ function renderPathway() {
     showView('pathway-view');
 }
 
-function renderTileOrbs(tileId) {
-    const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
-    if (!tile) {
-        console.error(`Tile ${tileId} non trovato`);
-        return;
+function toggleTileDropdown(tileId) {
+    if (openTiles.has(tileId)) {
+        openTiles.delete(tileId);
+    } else {
+        openTiles.add(tileId);
     }
+    
+    // Re-render solo il contenuto necessario per un'animazione fluida
+    updateTileDropdowns();
+}
 
-    if (!tile.orbs || tile.orbs.length === 0) {
-        // Tile vuoto, completa subito
-        eventBus.emit('updateProgress', { tileId });
-        renderPathway();
-        return;
-    }
-
-    let orbsHtml = tile.orbs.map((orb, orbIndex) => {
-        const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
-        const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
-        const totalContent = orb.contents.length;
+function updateTileDropdowns() {
+    const containers = pathwayView.querySelectorAll('.tile-container');
+    
+    containers.forEach(container => {
+        const tileId = container.dataset.tileId;
+        const isOpen = openTiles.has(tileId);
+        const header = container.querySelector('.tile-header');
+        const dropdown = container.querySelector('.orbs-dropdown');
+        const chevron = container.querySelector('.tile-chevron');
         
-        let contentIndicators = '';
-        if (lessonCount > 0) {
-            contentIndicators += `<span class="content-indicator lesson">📖 ${lessonCount}</span>`;
+        // Update classes for animation
+        if (isOpen) {
+            header.classList.add('open');
+            dropdown.classList.add('open');
+            chevron.classList.add('rotated');
+        } else {
+            header.classList.remove('open');
+            dropdown.classList.remove('open');
+            chevron.classList.remove('rotated');
         }
-        if (flashcardCount > 0) {
-            contentIndicators += `<span class="content-indicator flashcard">🃏 ${flashcardCount}</span>`;
+        
+        // Populate orbs content if opening
+        if (isOpen && !dropdown.querySelector('.orb-item')) {
+            const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
+            const orbsHtml = tile.orbs.map((orb, orbIndex) => {
+                const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
+                const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
+                const totalContent = orb.contents.length;
+                
+                let contentIndicators = '';
+                if (lessonCount > 0) {
+                    contentIndicators += `<span class="content-badge lesson">📖 ${lessonCount}</span>`;
+                }
+                if (flashcardCount > 0) {
+                    contentIndicators += `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>`;
+                }
+                
+                return `
+                    <div class="orb-item" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
+                        <div class="orb-content">
+                            <div class="orb-title">${orb.title}</div>
+                            <div class="orb-indicators">
+                                ${contentIndicators}
+                                <span class="total-badge">${totalContent} elementi</span>
+                            </div>
+                        </div>
+                        <div class="orb-arrow">▶</div>
+                    </div>
+                `;
+            }).join('');
+            
+            dropdown.querySelector('.orbs-content').innerHTML = orbsHtml;
+            
+            // Add event listeners to new orb items
+            dropdown.querySelectorAll('.orb-item').forEach(orbElement => {
+                const tileId = orbElement.dataset.tileId;
+                const orbIndex = parseInt(orbElement.dataset.orbIndex);
+                
+                orbElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    eventBus.emit('startLearningSession', { tileId, orbIndex });
+                });
+            });
         }
-        
-        return `
-            <div class="orb-tile" data-tile-id="${tileId}" data-orb-index="${orbIndex}">
-                <h4>${orb.title}</h4>
-                <div class="content-indicators">
-                    ${contentIndicators}
-                    <span class="total-content">(${totalContent} elementi)</span>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    const orbsViewHtml = `
-        <div class="card">
-            <button class="back-button">← Torna al percorso</button>
-            <h2>${tile.title}</h2>
-            <p>Seleziona un modulo per iniziare:</p>
-            <div id="orbs-container">${orbsHtml}</div>
-        </div>
-    `;
-
-    // Creiamo la view se non esiste
-    let orbsViewElement = document.getElementById('orbs-view');
-    if (!orbsViewElement) {
-        orbsViewElement = document.createElement('div');
-        orbsViewElement.id = 'orbs-view';
-        orbsViewElement.className = 'view';
-        document.querySelector('.container').appendChild(orbsViewElement);
-    }
-
-    orbsViewElement.innerHTML = orbsViewHtml;
-
-    // Aggiungi listener per tornare indietro
-    orbsViewElement.querySelector('.back-button').addEventListener('click', renderPathway);
-
-    // Aggiungi listener per gli orb
-    orbsViewElement.querySelectorAll('.orb-tile').forEach(orbElement => {
-        const tileId = orbElement.dataset.tileId;
-        const orbIndex = parseInt(orbElement.dataset.orbIndex);
-        
-        orbElement.addEventListener('click', () => {
-            eventBus.emit('startLearningSession', { tileId, orbIndex });
-        });
     });
-
-    showView('orbs-view');
 }
 
 function renderLearningSession(tileId, orbIndex = 0) {
@@ -142,24 +224,20 @@ function renderLearningSession(tileId, orbIndex = 0) {
     }
     
     if (!tile.orbs || tile.orbs.length === 0) {
-        // Tile vuoto, completa subito
         eventBus.emit('updateProgress', { tileId });
         renderPathway();
         return;
     }
 
-    // Indici per navigare la struttura gerarchica - iniziamo dall'orb selezionato
     let currentOrbIndex = orbIndex;
     let contentIndex = 0;
 
     const renderCurrentContent = () => {
-        // Se abbiamo finito i contenuti dell'orb corrente, passiamo al prossimo orb
         if (contentIndex >= tile.orbs[currentOrbIndex].contents.length) {
             contentIndex = 0;
             currentOrbIndex++;
         }
 
-        // Se abbiamo finito tutti gli orb, la sessione è finita
         if (currentOrbIndex >= tile.orbs.length) {
             eventBus.emit('updateProgress', { tileId });
             renderPathway();
@@ -168,7 +246,6 @@ function renderLearningSession(tileId, orbIndex = 0) {
 
         const currentOrb = tile.orbs[currentOrbIndex];
         
-        // Se l'orb corrente non ha contenuti, passa al prossimo
         if (!currentOrb.contents || currentOrb.contents.length === 0) {
             currentOrbIndex++;
             renderCurrentContent();
@@ -186,30 +263,68 @@ function renderLearningSession(tileId, orbIndex = 0) {
 
         if (currentContent.type === 'lesson') {
             contentHtml = `
-                <p>${currentContent.text}</p>
-                <button id="next-content-btn">Ho capito, continua</button>
+                <div class="content-lesson">
+                    <div class="lesson-icon">📖</div>
+                    <div class="lesson-content">
+                        <p class="lesson-text">${currentContent.text}</p>
+                        <button id="next-content-btn" class="next-btn">
+                            <span>Ho capito, continua</span>
+                            <span class="btn-arrow">→</span>
+                        </button>
+                    </div>
+                </div>
             `;
         } else if (currentContent.type === 'flashcard') {
             contentHtml = `
-                <p><strong>Domanda:</strong> ${currentContent.question}</p>
-                <p id="flashcard-answer" style="display:none;"><strong>Risposta:</strong> ${currentContent.answer}</p>
-                <button id="show-answer-btn">Mostra risposta</button>
-                <button id="next-content-btn" style="display:none;">Continua</button>
+                <div class="content-flashcard">
+                    <div class="flashcard-icon">🃏</div>
+                    <div class="flashcard-content">
+                        <div class="flashcard-question">
+                            <strong>Domanda:</strong> ${currentContent.question}
+                        </div>
+                        <div id="flashcard-answer" class="flashcard-answer hidden">
+                            <strong>Risposta:</strong> ${currentContent.answer}
+                        </div>
+                        <div class="flashcard-actions">
+                            <button id="show-answer-btn" class="show-answer-btn">
+                                <span>Mostra risposta</span>
+                                <span class="btn-icon">👁️</span>
+                            </button>
+                            <button id="next-content-btn" class="next-btn hidden">
+                                <span>Continua</span>
+                                <span class="btn-arrow">→</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             `;
         }
         
         learningView.innerHTML = `
-            <div class="card">
-                <button class="back-button">← Torna al percorso</button>
-                <h2>${tile.title}</h2>
-                <h3 style="font-weight: 600; color: #3b82f6;">${currentOrb.title}</h3>
-                <div id="learning-content">${contentHtml}</div>
+            <div class="learning-card">
+                <div class="learning-header">
+                    <button class="back-button">
+                        <span class="back-arrow">←</span>
+                        <span>Torna al percorso</span>
+                    </button>
+                    <div class="learning-breadcrumb">
+                        <span class="breadcrumb-tile">${tile.title}</span>
+                        <span class="breadcrumb-separator">•</span>
+                        <span class="breadcrumb-orb">${currentOrb.title}</span>
+                    </div>
+                </div>
+                <div class="learning-content">
+                    ${contentHtml}
+                </div>
+                <div class="learning-progress">
+                    <div class="progress-indicator">
+                        ${contentIndex + 1} di ${currentOrb.contents.length} in questo modulo
+                    </div>
+                </div>
             </div>
         `;
 
-        learningView.querySelector('.back-button').addEventListener('click', () => {
-            renderTileOrbs(tileId); // Torna alla view degli orb, non alla pathway
-        });
+        learningView.querySelector('.back-button').addEventListener('click', renderPathway);
         
         const nextButton = learningView.querySelector('#next-content-btn');
         if (nextButton) {
@@ -222,9 +337,12 @@ function renderLearningSession(tileId, orbIndex = 0) {
         const showAnswerButton = learningView.querySelector('#show-answer-btn');
         if (showAnswerButton) {
             showAnswerButton.addEventListener('click', () => {
-                learningView.querySelector('#flashcard-answer').style.display = 'block';
-                showAnswerButton.style.display = 'none';
-                nextButton.style.display = 'inline-block';
+                const answerDiv = learningView.querySelector('#flashcard-answer');
+                const nextBtn = learningView.querySelector('#next-content-btn');
+                
+                answerDiv.classList.remove('hidden');
+                showAnswerButton.classList.add('hidden');
+                nextBtn.classList.remove('hidden');
             });
         }
     };
@@ -239,10 +357,6 @@ eventBus.on('progressLoaded', (data) => {
     currentCourse = data.course;
     currentProgress = data.progress;
     renderPathway();
-});
-
-eventBus.on('showTileOrbs', ({ tileId }) => {
-    renderTileOrbs(tileId);
 });
 
 eventBus.on('startLearningSession', ({ tileId, orbIndex }) => {
