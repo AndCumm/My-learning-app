@@ -84,8 +84,11 @@ function renderLearningSession(tileId) {
     let contentIndex = 0;
 
     const renderCurrentContent = () => {
+        alert(`DEBUG: orbIndex=${orbIndex}, contentIndex=${contentIndex}`);
+        
         // Se abbiamo finito i contenuti dell'orb corrente, passiamo al prossimo orb
         if (contentIndex >= tile.orbs[orbIndex].contents.length) {
+            alert(`DEBUG: Finiti contenuti orb ${orbIndex}, passo al prossimo`);
             contentIndex = 0;
             orbIndex++;
         }
@@ -99,7 +102,23 @@ function renderLearningSession(tileId) {
         }
 
         const currentOrb = tile.orbs[orbIndex];
+        alert(`DEBUG: currentOrb = ${JSON.stringify(currentOrb)}`);
+        
+        if (!currentOrb.contents || currentOrb.contents.length === 0) {
+            alert(`DEBUG: Orb ${orbIndex} non ha contenuti!`);
+            orbIndex++; // Salta questo orb vuoto
+            renderCurrentContent(); // Riprova con il prossimo
+            return;
+        }
+        
         const currentContent = currentOrb.contents[contentIndex];
+        alert(`DEBUG: currentContent = ${JSON.stringify(currentContent)}`);
+        
+        if (!currentContent) {
+            alert(`DEBUG: ERRORE - currentContent è undefined!`);
+            return;
+        }
+        
         let contentHtml = '';
 
         if (currentContent.type === 'lesson') {
