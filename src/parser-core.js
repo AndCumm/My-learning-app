@@ -25,13 +25,15 @@ export function parseXML(xmlString) {
       const orbTitle = orbNode.querySelector("title")?.textContent.trim() || `Lezione ${orbIndex + 1}`;
       
       const contents = [];
-      orbNode.querySelectorAll("lesson").forEach(lessonNode => {
+      // FIX: Cerca sia "lesson" minuscolo che "LESSON" maiuscolo
+      orbNode.querySelectorAll("lesson, LESSON").forEach(lessonNode => {
         contents.push({ type: "lesson", text: lessonNode.textContent.trim() });
       });
       
-      orbNode.querySelectorAll("flashcard").forEach(fcNode => {
-        const q = fcNode.querySelector("question")?.textContent.trim();
-        const a = fcNode.querySelector("answer")?.textContent.trim();
+      // FIX: Cerca sia "flashcard" minuscolo che "FLASHCARD" maiuscolo
+      orbNode.querySelectorAll("flashcard, FLASHCARD").forEach(fcNode => {
+        const q = fcNode.querySelector("question, QUESTION")?.textContent.trim();
+        const a = fcNode.querySelector("answer, ANSWER")?.textContent.trim();
         if (q && a) {
           contents.push({ type: "flashcard", question: q, answer: a });
         }
