@@ -2,6 +2,7 @@ import { eventBus } from './eventBus.js';
 
 const loaderView = document.getElementById('loader-view');
 const pathwayView = document.getElementById('pathway-view');
+const orbsView = document.getElementById('orbs-view'); // Nuova view per gli orb
 const learningView = document.getElementById('learning-view');
 
 let currentCourse = null;
@@ -43,7 +44,7 @@ function renderPathway() {
     pathwayView.querySelectorAll('.tile').forEach(tileElement => {
         const tileId = tileElement.dataset.tileId;
         tileElement.addEventListener('click', () => {
-            eventBus.emit('startLearningSession', { tileId });
+            eventBus.emit('showTileOrbs', { tileId });
         });
     });
     
@@ -59,7 +60,81 @@ function renderPathway() {
     showView('pathway-view');
 }
 
-function renderLearningSession(tileId) {
+function renderTileOrbs(tileId) {
+    const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
+    if (!tile) {
+        console.error(`Tile ${tileId} non trovato`);
+        return;
+    }
+
+    if (!tile.orbs || tile.orbs.length === 0) {
+        // Tile vuoto, completa subito
+        eventBus.emit('updateProgress', { tileId });
+        renderPathway();
+        return;
+    }
+
+    let orbsHtml = tile.orbs.map((orb, orbIndex) => {
+        const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
+        const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
+        const totalContent = orb.contents.length;
+        
+        let contentIndicators = '';
+        if (lessonCount > 0) {
+            contentIndicators += `<span class="content-indicator lesson">📖 ${lessonCount}</span>`;
+        }
+        if (flashcardCount > 0) {
+            contentIndicators += `<span class="content-indicator flashcard">🃏 ${flashcardCount}</span>`;
+        }
+        
+        return `
+            <div class="orb-tile" data-tile-id="${tileId}" data-orb-index="${orbIndex}">
+                <h4>${orb.title}</h4>
+                <div class="content-indicators">
+                    ${contentIndicators}
+                    <span class="total-content">(${totalContent} elementi)</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const orbsViewHtml = `
+        <div class="card">
+            <button class="back-button">← Torna al percorso</button>
+            <h2>${tile.title}</h2>
+            <p>Seleziona un modulo per iniziare:</p>
+            <div id="orbs-container">${orbsHtml}</div>
+        </div>
+    `;
+
+    // Creiamo la view se non esiste
+    let orbsViewElement = document.getElementById('orbs-view');
+    if (!orbsViewElement) {
+        orbsViewElement = document.createElement('div');
+        orbsViewElement.id = 'orbs-view';
+        orbsViewElement.className = 'view';
+        document.querySelector('.container').appendChild(orbsViewElement);
+    }
+
+    orbsViewElement.innerHTML = orbsViewHtml;
+
+    // Aggiungi listener per tornare indietro
+    orbsViewElement.querySelector('.back-button').addEventListener('click', renderPathway);
+
+    // Aggiungi listener per gli orb
+    orbsViewElement.querySelectorAll('.orb-tile').forEach(orbElement => {
+        const tileId = orbElement.dataset.tileId;
+        const orbIndex = parseInt(orbElement.dataset.orbIndex);
+        
+        orbElement.addEventListener('click', () => {
+            eventBus.emit('startLearningSession', { tileId, orbIndex });
+        });
+    });
+
+    showView('orbs-view');
+}
+
+function renderLearningSession(tileId, orbIndex = 0) {
     const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
     if (!tile) {
         console.error(`Tile ${tileId} non trovato`);
@@ -73,29 +148,29 @@ function renderLearningSession(tileId) {
         return;
     }
 
-    // Indici per navigare la struttura gerarchica
-    let orbIndex = 0;
+    // Indici per navigare la struttura gerarchica - iniziamo dall'orb selezionato
+    let currentOrbIndex = orbIndex;
     let contentIndex = 0;
 
     const renderCurrentContent = () => {
         // Se abbiamo finito i contenuti dell'orb corrente, passiamo al prossimo orb
-        if (contentIndex >= tile.orbs[orbIndex].contents.length) {
+        if (contentIndex >= tile.orbs[currentOrbIndex].contents.length) {
             contentIndex = 0;
-            orbIndex++;
+            currentOrbIndex++;
         }
 
         // Se abbiamo finito tutti gli orb, la sessione è finita
-        if (orbIndex >= tile.orbs.length) {
+        if (currentOrbIndex >= tile.orbs.length) {
             eventBus.emit('updateProgress', { tileId });
             renderPathway();
             return;
         }
 
-        const currentOrb = tile.orbs[orbIndex];
+        const currentOrb = tile.orbs[currentOrbIndex];
         
         // Se l'orb corrente non ha contenuti, passa al prossimo
         if (!currentOrb.contents || currentOrb.contents.length === 0) {
-            orbIndex++;
+            currentOrbIndex++;
             renderCurrentContent();
             return;
         }
@@ -132,7 +207,9 @@ function renderLearningSession(tileId) {
             </div>
         `;
 
-        learningView.querySelector('.back-button').addEventListener('click', renderPathway);
+        learningView.querySelector('.back-button').addEventListener('click', () => {
+            renderTileOrbs(tileId); // Torna alla view degli orb, non alla pathway
+        });
         
         const nextButton = learningView.querySelector('#next-content-btn');
         if (nextButton) {
@@ -164,8 +241,12 @@ eventBus.on('progressLoaded', (data) => {
     renderPathway();
 });
 
-eventBus.on('startLearningSession', ({ tileId }) => {
-    renderLearningSession(tileId);
+eventBus.on('showTileOrbs', ({ tileId }) => {
+    renderTileOrbs(tileId);
+});
+
+eventBus.on('startLearningSession', ({ tileId, orbIndex }) => {
+    renderLearningSession(tileId, orbIndex);
 });
 
 eventBus.on('progressUpdated', (newProgress) => {
