@@ -1,23 +1,23 @@
 export function loadProgress(title) {
   const key = `progress_${title}`;
   const saved = JSON.parse(localStorage.getItem(key)) || {};
-  if (saved.completedTiles) {
-    // Riconverte l'array salvato in un Set
-    saved.completedTiles = new Set(saved.completedTiles);
+  // MODIFICA: cerchiamo e convertiamo completedOrbs, non più completedTiles
+  if (saved.completedOrbs) {
+    saved.completedOrbs = new Set(saved.completedOrbs);
   }
   return saved;
 }
 
 export function saveProgress(title, progress) {
   const key = `progress_${title}`;
-  // Converte il Set in un Array per la serializzazione JSON
-  const toSave = { ...progress, completedTiles: Array.from(progress.completedTiles) };
+  // MODIFICA: salviamo completedOrbs
+  const toSave = { ...progress, completedOrbs: Array.from(progress.completedOrbs) };
   localStorage.setItem(key, JSON.stringify(toSave));
 }
 
 export function createEmptyProgress() {
+  // MODIFICA: la nostra struttura ora si basa su completedOrbs
   return {
-    currentCraneIndex: 0,
-    completedTiles: new Set()
+    completedOrbs: new Set()
   };
 }
