@@ -15,7 +15,7 @@ function showView(viewId) {
 
 function renderPathway() {
     const { course, progress } = { course: currentCourse, progress: currentProgress };
-    
+
     const totalTiles = course.pathway.tiles.length;
     const completedCount = progress.completedTiles.size;
     const percentage = Math.min(100, Math.round((completedCount / totalTiles) * 100 || 0));
@@ -23,7 +23,7 @@ function renderPathway() {
     let tilesHtml = course.pathway.tiles.map(tile => {
         const isCompleted = progress.completedTiles.has(tile.id);
         const isOpen = openTiles.has(tile.id);
-        
+
         // Genera gli orb per questo tile se è aperto
         let orbsHtml = '';
         if (isOpen) {
@@ -31,7 +31,7 @@ function renderPathway() {
                 const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
                 const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
                 const totalContent = orb.contents.length;
-                
+
                 let contentIndicators = '';
                 if (lessonCount > 0) {
                     contentIndicators += `<span class="content-badge lesson">📖 ${lessonCount}</span>`;
@@ -39,7 +39,7 @@ function renderPathway() {
                 if (flashcardCount > 0) {
                     contentIndicators += `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>`;
                 }
-                
+
                 return `
                     <div class="orb-item" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
                         <div class="orb-content">
@@ -54,7 +54,7 @@ function renderPathway() {
                 `;
             }).join('');
         }
-        
+
         return `
             <div class="tile-container ${isCompleted ? 'completed' : ''}" data-tile-id="${tile.id}">
                 <div class="tile-header ${isOpen ? 'open' : ''}">
@@ -107,7 +107,7 @@ function renderPathway() {
     pathwayView.querySelectorAll('.tile-header').forEach(tileHeader => {
         const container = tileHeader.closest('.tile-container');
         const tileId = container.dataset.tileId;
-        
+
         tileHeader.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleTileDropdown(tileId);
@@ -118,13 +118,13 @@ function renderPathway() {
     pathwayView.querySelectorAll('.orb-item').forEach(orbElement => {
         const tileId = orbElement.dataset.tileId;
         const orbIndex = parseInt(orbElement.dataset.orbIndex);
-        
+
         orbElement.addEventListener('click', (e) => {
             e.stopPropagation();
             eventBus.emit('startLearningSession', { tileId, orbIndex });
         });
     });
-    
+
     // Event listener per il reset
     const resetButton = pathwayView.querySelector('#reset-progress-btn');
     if (resetButton) {
@@ -134,7 +134,7 @@ function renderPathway() {
             }
         });
     }
-    
+
     showView('pathway-view');
 }
 
@@ -160,14 +160,14 @@ function toggleTileDropdown(tileId) {
 
 function updateTileDropdowns() {
     const containers = pathwayView.querySelectorAll('.tile-container');
-    
+
     containers.forEach(container => {
         const tileId = container.dataset.tileId;
         const isOpen = openTiles.has(tileId);
         const header = container.querySelector('.tile-header');
         const dropdown = container.querySelector('.orbs-dropdown');
         const chevron = container.querySelector('.tile-chevron');
-        
+
         // Update classes for animation
         if (isOpen) {
             header.classList.add('open');
@@ -178,7 +178,7 @@ function updateTileDropdowns() {
             dropdown.classList.remove('open');
             chevron.classList.remove('rotated');
         }
-        
+
         // Populate orbs content if opening
         if (isOpen && !dropdown.querySelector('.orb-item')) {
             const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
@@ -186,7 +186,7 @@ function updateTileDropdowns() {
                 const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
                 const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
                 const totalContent = orb.contents.length;
-                
+
                 let contentIndicators = '';
                 if (lessonCount > 0) {
                     contentIndicators += `<span class="content-badge lesson">📖 ${lessonCount}</span>`;
@@ -194,7 +194,7 @@ function updateTileDropdowns() {
                 if (flashcardCount > 0) {
                     contentIndicators += `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>`;
                 }
-                
+
                 return `
                     <div class="orb-item" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
                         <div class="orb-content">
@@ -208,14 +208,14 @@ function updateTileDropdowns() {
                     </div>
                 `;
             }).join('');
-            
+
             dropdown.querySelector('.orbs-content').innerHTML = orbsHtml;
-            
+
             // Add event listeners to new orb items
             dropdown.querySelectorAll('.orb-item').forEach(orbElement => {
                 const tileId = orbElement.dataset.tileId;
                 const orbIndex = parseInt(orbElement.dataset.orbIndex);
-                
+
                 orbElement.addEventListener('click', (e) => {
                     e.stopPropagation();
                     eventBus.emit('startLearningSession', { tileId, orbIndex });
@@ -231,7 +231,7 @@ function renderLearningSession(tileId, orbIndex = 0) {
         console.error(`Tile ${tileId} non trovato`);
         return;
     }
-    
+
     if (!tile.orbs || tile.orbs.length === 0) {
         eventBus.emit('updateProgress', { tileId });
         renderPathway();
@@ -254,20 +254,20 @@ function renderLearningSession(tileId, orbIndex = 0) {
         }
 
         const currentOrb = tile.orbs[currentOrbIndex];
-        
+
         if (!currentOrb.contents || currentOrb.contents.length === 0) {
             currentOrbIndex++;
             renderCurrentContent();
             return;
         }
-        
+
         const currentContent = currentOrb.contents[contentIndex];
-        
+
         if (!currentContent) {
             console.error('Contenuto non trovato');
             return;
         }
-        
+
         let contentHtml = '';
 
         if (currentContent.type === 'lesson') {
@@ -308,7 +308,7 @@ function renderLearningSession(tileId, orbIndex = 0) {
                 </div>
             `;
         }
-        
+
         learningView.innerHTML = `
             <div class="learning-card">
                 <div class="learning-header">
@@ -334,7 +334,7 @@ function renderLearningSession(tileId, orbIndex = 0) {
         `;
 
         learningView.querySelector('.back-button').addEventListener('click', renderPathway);
-        
+
         const nextButton = learningView.querySelector('#next-content-btn');
         if (nextButton) {
             nextButton.addEventListener('click', () => {
@@ -342,13 +342,13 @@ function renderLearningSession(tileId, orbIndex = 0) {
                 renderCurrentContent();
             });
         }
-        
+
         const showAnswerButton = learningView.querySelector('#show-answer-btn');
         if (showAnswerButton) {
             showAnswerButton.addEventListener('click', () => {
                 const answerDiv = learningView.querySelector('#flashcard-answer');
                 const nextBtn = learningView.querySelector('#next-content-btn');
-                
+
                 answerDiv.classList.remove('hidden');
                 showAnswerButton.classList.add('hidden');
                 nextBtn.classList.remove('hidden');
@@ -359,6 +359,36 @@ function renderLearningSession(tileId, orbIndex = 0) {
     renderCurrentContent();
     showView('learning-view');
 }
+
+// --- NUOVA FUNZIONE ESPORTATA ---
+export function renderSavedCourse(savedCourse) {
+    const container = document.getElementById('saved-courses-view');
+    if (!container) return;
+
+    if (savedCourse && savedCourse.title && savedCourse.xml) {
+        container.innerHTML = `
+            <div class="saved-course-card">
+                <h3>Corso Recente</h3>
+                <p>Riprendi da dove hai lasciato.</p>
+                <button id="load-saved-course-btn" class="saved-course-btn">
+                    <span class="course-title">▶ ${savedCourse.title}</span>
+                </button>
+            </div>
+            <hr class="divider">
+        `;
+
+        // Aggiungiamo l'evento al pulsante per caricare il corso
+        document.getElementById('load-saved-course-btn').addEventListener('click', () => {
+            // Emettiamo un evento con il contenuto XML del corso salvato
+            eventBus.emit('loadSavedCourse', savedCourse.xml);
+        });
+
+    } else {
+        // Se non ci sono corsi salvati, non mostriamo nulla
+        container.innerHTML = '';
+    }
+}
+
 
 // --- GESTIONE EVENTI GLOBALI ---
 
