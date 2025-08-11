@@ -6,7 +6,45 @@ const learningView = document.getElementById('learning-view');
 
 let currentCourse = null;
 let currentProgress = null;
-let openTiles = new Set(); // Tiene traccia di quali tile sono aperti
+let openTiles = new Set();
+
+// NUOVA FUNZIONE per mostrare la lista dei corsi
+export function renderCourseList(courses) {
+  const container = document.getElementById('saved-courses-view');
+  const fileInputSection = document.getElementById('file-input-section');
+  if (!container) return;
+
+  // Nascondiamo il caricamento manuale dei file
+  if(fileInputSection) {
+    fileInputSection.style.display = 'none';
+  }
+
+  const courseButtonsHtml = courses.map(course => `
+    <button class="saved-course-btn" data-course-file="${course.file}">
+      <strong>${course.title}</strong>
+      <br>
+      <small>${course.description}</small>
+    </button>
+  `).join('');
+
+  container.innerHTML = `
+    <div class="saved-course-card">
+      <h3>I Miei Corsi</h3>
+      <p>Seleziona un corso per iniziare.</p>
+      <div class="course-list">
+        ${courseButtonsHtml}
+      </div>
+    </div>
+  `;
+
+  // Aggiungi event listener a ogni pulsante
+  container.querySelectorAll('.saved-course-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const courseFile = button.dataset.courseFile;
+      eventBus.emit('loadCourse', courseFile);
+    });
+  });
+}
 
 function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -14,6 +52,9 @@ function showView(viewId) {
 }
 
 function renderPathway() {
+    // ... (Il resto di questa funzione e delle altre funzioni rimane ESATTAMENTE UGUALE)
+    // ... (renderPathway, toggleTileDropdown, updateTileDropdowns, renderLearningSession)
+    // ... (tutta la logica per mostrare il percorso, i tile, gli orb, ecc. non cambia)
     const { course, progress } = { course: currentCourse, progress: currentProgress };
 
     const totalTiles = course.pathway.tiles.length;
@@ -24,7 +65,6 @@ function renderPathway() {
         const isCompleted = progress.completedTiles.has(tile.id);
         const isOpen = openTiles.has(tile.id);
 
-        // Genera gli orb per questo tile se è aperto
         let orbsHtml = '';
         if (isOpen) {
             orbsHtml = tile.orbs.map((orb, orbIndex) => {
@@ -107,7 +147,6 @@ function renderPathway() {
         </div>
     `;
 
-    // Event listeners per i tile headers (toggle dropdown)
     pathwayView.querySelectorAll('.tile-header').forEach(tileHeader => {
         const container = tileHeader.closest('.tile-container');
         const tileId = container.dataset.tileId;
@@ -118,7 +157,6 @@ function renderPathway() {
         });
     });
 
-    // Event listeners per gli orb
     pathwayView.querySelectorAll('.orb-item').forEach(orbElement => {
         const tileId = orbElement.dataset.tileId;
         const orbIndex = parseInt(orbElement.dataset.orbIndex);
@@ -129,7 +167,6 @@ function renderPathway() {
         });
     });
 
-    // Event listener per il reset
     const resetButton = pathwayView.querySelector('#reset-progress-btn');
     if (resetButton) {
         resetButton.addEventListener('click', () => {
@@ -156,10 +193,8 @@ function toggleTileDropdown(tileId) {
         openTiles.add(tileId);
     }
 
-    // Aggiungi questo pezzo per lo scroll automatico
     const container = pathwayView.querySelector(`.tile-container[data-tile-id="${tileId}"]`);
     if (container) {
-        // Un piccolo timeout per dare tempo al CSS di iniziare l'animazione
         setTimeout(() => {
             container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 100);
@@ -179,7 +214,6 @@ function updateTileDropdowns() {
         const dropdown = container.querySelector('.orbs-dropdown');
         const chevron = container.querySelector('.tile-chevron');
 
-        // Update classes for animation
         if (isOpen) {
             header.classList.add('open');
             dropdown.classList.add('open');
@@ -190,7 +224,6 @@ function updateTileDropdowns() {
             chevron.classList.remove('rotated');
         }
 
-        // Populate orbs content if opening
         if (isOpen && !dropdown.querySelector('.orb-item')) {
             const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
             const orbsHtml = tile.orbs.map((orb, orbIndex) => {
@@ -222,7 +255,6 @@ function updateTileDropdowns() {
 
             dropdown.querySelector('.orbs-content').innerHTML = orbsHtml;
 
-            // Add event listeners to new orb items
             dropdown.querySelectorAll('.orb-item').forEach(orbElement => {
                 const tileId = orbElement.dataset.tileId;
                 const orbIndex = parseInt(orbElement.dataset.orbIndex);
@@ -370,38 +402,6 @@ function renderLearningSession(tileId, orbIndex = 0) {
     renderCurrentContent();
     showView('learning-view');
 }
-
-// --- NUOVA FUNZIONE ESPORTATA ---
-export function renderSavedCourse(savedCourse) {
-    const container = document.getElementById('saved-courses-view');
-    if (!container) return;
-
-    if (savedCourse && savedCourse.title && savedCourse.xml) {
-        container.innerHTML = `
-            <div class="saved-course-card">
-                <h3>Corso Recente</h3>
-                <p>Riprendi da dove hai lasciato.</p>
-                <button id="load-saved-course-btn" class="saved-course-btn">
-                    <span class="course-title">▶ ${savedCourse.title}</span>
-                </button>
-            </div>
-            <hr class="divider">
-        `;
-
-        // Aggiungiamo l'evento al pulsante per caricare il corso
-        document.getElementById('load-saved-course-btn').addEventListener('click', () => {
-            // Emettiamo un evento con il contenuto XML del corso salvato
-            eventBus.emit('loadSavedCourse', savedCourse.xml);
-        });
-
-    } else {
-        // Se non ci sono corsi salvati, non mostriamo nulla
-        container.innerHTML = '';
-    }
-}
-
-
-// --- GESTIONE EVENTI GLOBALI ---
 
 eventBus.on('progressLoaded', (data) => {
     currentCourse = data.course;
