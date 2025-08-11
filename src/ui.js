@@ -275,42 +275,30 @@ function renderLearningSession(tileId, orbIndex = 0) {
         return;
     }
 
-    if (!tile.orbs || tile.orbs.length === 0) {
+    // --- NUOVA LOGICA: INIZIO ---
+    // Creiamo una coda di sessione con tutto il contenuto dell'orb.
+    // Usiamo structuredClone per creare una copia "profonda" e non modificare l'oggetto originale.
+    const initialOrb = tile.orbs[orbIndex];
+    if (!initialOrb || !initialOrb.contents) { // Se l'orb non ha contenuti, termina subito
         eventBus.emit('updateProgress', { tileId });
         renderPathway();
         return;
     }
-
-    let currentOrbIndex = orbIndex;
-    let contentIndex = 0;
+    const sessionQueue = structuredClone(initialOrb.contents);
+    // --- NUOVA LOGICA: FINE ---
 
     const renderCurrentContent = () => {
-        if (contentIndex >= tile.orbs[currentOrbIndex].contents.length) {
-            contentIndex = 0;
-            currentOrbIndex++;
-        }
-
-        if (currentOrbIndex >= tile.orbs.length) {
+        // --- MODIFICA: La sessione finisce quando la coda è vuota ---
+        if (sessionQueue.length === 0) {
+            // L'orb è completato!
             eventBus.emit('updateProgress', { tileId });
             renderPathway();
             return;
         }
 
-        const currentOrb = tile.orbs[currentOrbIndex];
-
-        if (!currentOrb.contents || currentOrb.contents.length === 0) {
-            currentOrbIndex++;
-            renderCurrentContent();
-            return;
-        }
-
-        const currentContent = currentOrb.contents[contentIndex];
-
-        if (!currentContent) {
-            console.error('Contenuto non trovato');
-            return;
-        }
-
+        // Prendiamo il prossimo elemento dalla coda
+        const currentContent = sessionQueue.shift(); 
+        
         let contentHtml = '';
 
         if (currentContent.type === 'lesson') {
@@ -319,10 +307,12 @@ function renderLearningSession(tileId, orbIndex = 0) {
                     <div class="lesson-icon">📖</div>
                     <div class="lesson-content">
                         <p class="lesson-text">${currentContent.text}</p>
-                        <button id="next-content-btn" class="next-btn">
-                            <span>Ho capito, continua</span>
-                            <span class="btn-arrow">→</span>
-                        </button>
+                        <div class="flashcard-actions">
+                            <button id="next-lesson-btn" class="next-btn">
+                                <span>Ho capito, continua</span>
+                                <span class="btn-arrow">→</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -340,12 +330,10 @@ function renderLearningSession(tileId, orbIndex = 0) {
                         <div class="flashcard-actions">
                             <button id="show-answer-btn" class="show-answer-btn">
                                 <span>Mostra risposta</span>
-                                <span class="btn-icon">👁️</span>
                             </button>
-                            <button id="next-content-btn" class="next-btn hidden">
-                                <span>Continua</span>
-                                <span class="btn-arrow">→</span>
-                            </button>
+                            
+                            <button id="wrong-btn" class="wrong-btn hidden">❌ Sbagliato</button>
+                            <button id="correct-btn" class="correct-btn hidden">✅ Giusto</button>
                         </div>
                     </div>
                 </div>
@@ -362,7 +350,7 @@ function renderLearningSession(tileId, orbIndex = 0) {
                     <div class="learning-breadcrumb">
                         <span class="breadcrumb-tile">${tile.title}</span>
                         <span class="breadcrumb-separator">•</span>
-                        <span class="breadcrumb-orb">${currentOrb.title}</span>
+                        <span class="breadcrumb-orb">${initialOrb.title}</span>
                     </div>
                 </div>
                 <div class="learning-content">
@@ -370,31 +358,43 @@ function renderLearningSession(tileId, orbIndex = 0) {
                 </div>
                 <div class="learning-progress">
                     <div class="progress-indicator">
-                        ${contentIndex + 1} di ${currentOrb.contents.length} in questo modulo
+                        Elementi rimasti in questa sessione: ${sessionQueue.length + 1}
                     </div>
                 </div>
             </div>
         `;
 
         learningView.querySelector('.back-button').addEventListener('click', renderPathway);
+        
+        // --- LOGICA EVENTI AGGIORNATA ---
 
-        const nextButton = learningView.querySelector('#next-content-btn');
-        if (nextButton) {
-            nextButton.addEventListener('click', () => {
-                contentIndex++;
-                renderCurrentContent();
-            });
+        // Se è una lezione, il pulsante "continua" fa semplicemente avanzare
+        const nextLessonBtn = learningView.querySelector('#next-lesson-btn');
+        if (nextLessonBtn) {
+            nextLessonBtn.addEventListener('click', renderCurrentContent);
         }
-
+        
+        // Se è una flashcard...
         const showAnswerButton = learningView.querySelector('#show-answer-btn');
         if (showAnswerButton) {
-            showAnswerButton.addEventListener('click', () => {
-                const answerDiv = learningView.querySelector('#flashcard-answer');
-                const nextBtn = learningView.querySelector('#next-content-btn');
+            const answerDiv = learningView.querySelector('#flashcard-answer');
+            const correctBtn = learningView.querySelector('#correct-btn');
+            const wrongBtn = learningView.querySelector('#wrong-btn');
 
+            showAnswerButton.addEventListener('click', () => {
                 answerDiv.classList.remove('hidden');
                 showAnswerButton.classList.add('hidden');
-                nextBtn.classList.remove('hidden');
+                correctBtn.classList.remove('hidden');
+                wrongBtn.classList.remove('hidden');
+            });
+            
+            // Pulsante "Giusto": passa al prossimo elemento
+            correctBtn.addEventListener('click', renderCurrentContent);
+
+            // Pulsante "Sbagliato": rimette la flashcard in coda e passa al prossimo
+            wrongBtn.addEventListener('click', () => {
+                sessionQueue.push(currentContent); // Rimette la flashcard in fondo alla coda!
+                renderCurrentContent(); // Passa al prossimo elemento
             });
         }
     };
