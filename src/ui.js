@@ -90,7 +90,6 @@ function renderPathway() {
                         </div>
                     </div>
                     <div class="action-buttons">
-                            {/* NUOVO PULSANTE "CAMBIA CORSO" */}
                         <button id="back-to-loader-btn" class="secondary-btn">
                             <span class="btn-icon">↩️</span>
                             <span class="btn-text">Cambia Corso</span>
