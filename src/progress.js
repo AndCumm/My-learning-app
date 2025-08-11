@@ -7,21 +7,30 @@ let currentProgress = null;
 eventBus.on('courseLoaded', course => {
   currentCourseTitle = course.title;
   const saved = loadProgress(course.title);
-  currentProgress = Object.keys(saved).length ? saved : createEmptyProgress();
+
+  // --- MODIFICA CHIAVE: INIZIO ---
+  // Invece di controllare solo se 'saved' esiste, controlliamo
+  // che abbia la struttura dati corretta (la proprietà 'completedOrbs').
+  // Se non ce l'ha, lo consideriamo come un salvataggio non valido e ne creiamo uno nuovo.
+  if (saved && saved.completedOrbs) {
+    currentProgress = saved;
+  } else {
+    currentProgress = createEmptyProgress();
+  }
+  // --- MODIFICA CHIAVE: FINE ---
+
   eventBus.emit('progressLoaded', { course, progress: currentProgress });
 });
 
-// MODIFICA: Ascoltiamo 'orbCompleted' invece di 'updateProgress'
 eventBus.on('orbCompleted', ({ tileId, orbIndex }) => {
   if (currentProgress) {
-    const orbId = `${tileId}-orb-${orbIndex}`; // Creiamo un ID unico per l'orb
+    const orbId = `${tileId}-orb-${orbIndex}`;
     const wasAlreadyCompleted = currentProgress.completedOrbs.has(orbId);
 
     if (!wasAlreadyCompleted) {
       currentProgress.completedOrbs.add(orbId);
       saveProgress(currentCourseTitle, currentProgress);
       console.log(`Orb completato: ${orbId}. Totale completati: ${currentProgress.completedOrbs.size}`);
-      // Emettiamo un evento generico di aggiornamento
       eventBus.emit('progressUpdated', currentProgress);
     }
   }
