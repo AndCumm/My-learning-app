@@ -362,6 +362,41 @@ body {
     background-color: #d1d1d6;
 }
 
+.correct-btn, .wrong-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-grow: 1; /* Fa in modo che i due pulsanti occupino lo stesso spazio */
+    padding: 0.8rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+    color: white;
+}
+
+.correct-btn {
+    background-color: var(--success-color);
+}
+.correct-btn:hover {
+    background-color: #28a745;
+}
+
+.wrong-btn {
+    background-color: var(--danger-color);
+}
+.wrong-btn:hover {
+    background-color: #dc3545;
+}
+
+.flashcard-actions {
+    margin-top: 1.5rem;
+    display: flex; /* NUOVO: per allineare i pulsanti */
+    gap: 0.75rem; /* NUOVO: per spaziare i pulsanti */
+}
+
 .learning-progress {
     margin-top: 2rem;
     text-align: center;
