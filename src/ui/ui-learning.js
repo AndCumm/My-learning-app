@@ -1,7 +1,8 @@
 import { eventBus } from '../eventBus.js';
-import { learningView, showView, pathwayView } from './ui-common.js';
+import { learningView, showView } from './ui-common.js';
+import { renderPathway } from './ui-pathway.js'; // Importiamo renderPathway per il tasto back
 
-export function renderLearningSession(course, tileId, orbIndex) {
+export function renderLearningSession(course, progress, tileId, orbIndex) {
     const tile = course.pathway.tiles.find(t => t.id === tileId);
     if (!tile) return;
     
@@ -21,7 +22,21 @@ export function renderLearningSession(course, tileId, orbIndex) {
         
         let contentHtml = '';
         if (currentContent.type === 'lesson') {
-            contentHtml = `<div class="content-lesson">...</div>`; // Codice HTML della lezione qui
+            // --- CORREZIONE QUI ---
+            // Ho inserito il codice HTML corretto per visualizzare la lezione.
+            contentHtml = `
+                <div class="content-lesson">
+                    <div class="lesson-icon">📖</div>
+                    <div class="lesson-content">
+                        <p class="lesson-text">${currentContent.text}</p>
+                        <div class="flashcard-actions">
+                            <button id="next-lesson-btn" class="next-btn">
+                                <span>Ho capito, continua</span>
+                                <span class="btn-arrow">→</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
         } else if (currentContent.type === 'flashcard') {
             contentHtml = `
                 <div class="content-flashcard">
@@ -47,11 +62,19 @@ export function renderLearningSession(course, tileId, orbIndex) {
                     </div>
                 </div>
                 <div class="learning-content">${contentHtml}</div>
-                <div class="learning-progress">Elementi rimasti: ${sessionQueue.length + 1}</div>
+                <div class="learning-progress">
+                    <div class="progress-indicator">Elementi rimasti in questa sessione: ${sessionQueue.length + 1}</div>
+                </div>
             </div>`;
-
-        learningView.querySelector('.back-button').addEventListener('click', () => showView(pathwayView));
         
+        // Ho spostato qui la logica del tasto back-button per renderla più chiara
+        learningView.querySelector('.back-button').addEventListener('click', () => renderPathway(course, progress));
+        
+        const nextLessonBtn = learningView.querySelector('#next-lesson-btn');
+        if (nextLessonBtn) {
+            nextLessonBtn.addEventListener('click', renderCurrentContent);
+        }
+
         const showAnswerBtn = learningView.querySelector('#show-answer-btn');
         if (showAnswerBtn) {
             const answerDiv = learningView.querySelector('#flashcard-answer');
