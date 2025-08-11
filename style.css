@@ -80,6 +80,7 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 1.5rem;
+    flex-wrap: wrap; /* Per adattarsi su schermi piccoli */
 }
 
 .progress-text {
@@ -108,6 +109,11 @@ body {
     transition: width var(--transition-speed) ease;
 }
 
+.action-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
 .reset-btn {
     display: flex;
     align-items: center;
@@ -124,6 +130,24 @@ body {
 
 .reset-btn:hover {
     background-color: #fecaca;
+}
+
+.secondary-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #e5e5ea;
+    color: var(--text-color);
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+}
+
+.secondary-btn:hover {
+    background-color: #d1d1d6;
 }
 
 .tiles-container {
