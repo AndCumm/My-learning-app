@@ -8,42 +8,40 @@ let currentCourse = null;
 let currentProgress = null;
 let openTiles = new Set();
 
-// NUOVA FUNZIONE per mostrare la lista dei corsi
 export function renderCourseList(courses) {
-  const container = document.getElementById('saved-courses-view');
-  const fileInputSection = document.getElementById('file-input-section');
-  if (!container) return;
+    const container = document.getElementById('saved-courses-view');
+    const fileInputSection = document.getElementById('file-input-section');
+    if (!container) return;
 
-  // Nascondiamo il caricamento manuale dei file
-  if(fileInputSection) {
-    fileInputSection.style.display = 'none';
-  }
+    // Se esiste una sezione per l'input file, la nascondiamo per far posto alla lista corsi
+    if(fileInputSection) {
+        fileInputSection.style.display = 'none';
+    }
 
-  const courseButtonsHtml = courses.map(course => `
-    <button class="saved-course-btn" data-course-file="${course.file}">
-      <strong>${course.title}</strong>
-      <br>
-      <small>${course.description}</small>
-    </button>
-  `).join('');
+    const courseButtonsHtml = courses.map(course => `
+        <button class="saved-course-btn" data-course-file="${course.file}">
+        <strong>${course.title}</strong>
+        <br>
+        <small>${course.description}</small>
+        </button>
+    `).join('');
 
-  container.innerHTML = `
-    <div class="saved-course-card">
-      <h3>I Miei Corsi</h3>
-      <p>Seleziona un corso per iniziare.</p>
-      <div class="course-list">
-        ${courseButtonsHtml}
-      </div>
-    </div>
-  `;
+    container.innerHTML = `
+        <div class="saved-course-card">
+        <h3>I Miei Corsi</h3>
+        <p>Seleziona un corso per iniziare.</p>
+        <div class="course-list">
+            ${courseButtonsHtml}
+        </div>
+        </div>
+    `;
 
-  // Aggiungi event listener a ogni pulsante
-  container.querySelectorAll('.saved-course-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      const courseFile = button.dataset.courseFile;
-      eventBus.emit('loadCourse', courseFile);
+    container.querySelectorAll('.saved-course-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const courseFile = button.dataset.courseFile;
+            eventBus.emit('loadCourse', courseFile);
+        });
     });
-  });
 }
 
 function showView(viewId) {
@@ -52,57 +50,60 @@ function showView(viewId) {
 }
 
 function renderPathway() {
-    // ... (Il resto di questa funzione e delle altre funzioni rimane ESATTAMENTE UGUALE)
-    // ... (renderPathway, toggleTileDropdown, updateTileDropdowns, renderLearningSession)
-    // ... (tutta la logica per mostrare il percorso, i tile, gli orb, ecc. non cambia)
     const { course, progress } = { course: currentCourse, progress: currentProgress };
 
-    const totalTiles = course.pathway.tiles.length;
-    const completedCount = progress.completedTiles.size;
-    const percentage = Math.min(100, Math.round((completedCount / totalTiles) * 100 || 0));
+    // Calcolo della percentuale basato sugli orb
+    const totalOrbs = course.pathway.tiles.reduce((sum, tile) => sum + tile.orbs.length, 0);
+    const completedOrbsCount = progress.completedOrbs.size;
+    const percentage = totalOrbs > 0 ? Math.round((completedOrbsCount / totalOrbs) * 100) : 0;
+    
+    // Logica per bloccare i tile: si parte con il primo sbloccato
+    let previousTileCompleted = true; 
 
     let tilesHtml = course.pathway.tiles.map(tile => {
-        const isCompleted = progress.completedTiles.has(tile.id);
+        // Un tile è completo se tutti i suoi orb sono stati completati
+        const orbsInTile = tile.orbs.length;
+        const completedOrbsInTile = tile.orbs.filter((orb, i) => progress.completedOrbs.has(`${tile.id}-orb-${i}`)).length;
+        const isTileCompleted = orbsInTile > 0 && completedOrbsInTile === orbsInTile;
+
+        const isTileLocked = !previousTileCompleted;
         const isOpen = openTiles.has(tile.id);
 
         let orbsHtml = '';
         if (isOpen) {
             orbsHtml = tile.orbs.map((orb, orbIndex) => {
+                const isOrbCompleted = progress.completedOrbs.has(`${tile.id}-orb-${orbIndex}`);
+                const isOrbLocked = isTileLocked; // Gli orb ereditano lo stato di blocco dal tile
+
                 const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
                 const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
-                const totalContent = orb.contents.length;
-
-                let contentIndicators = '';
-                if (lessonCount > 0) {
-                    contentIndicators += `<span class="content-badge lesson">📖 ${lessonCount}</span>`;
-                }
-                if (flashcardCount > 0) {
-                    contentIndicators += `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>`;
-                }
-
+                
                 return `
-                    <div class="orb-item" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
+                    <div class="orb-item ${isOrbLocked ? 'locked' : ''}" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
                         <div class="orb-content">
                             <div class="orb-title">${orb.title}</div>
                             <div class="orb-indicators">
-                                ${contentIndicators}
-                                <span class="total-badge">${totalContent} elementi</span>
+                                ${lessonCount > 0 ? `<span class="content-badge lesson">📖 ${lessonCount}</span>` : ''}
+                                ${flashcardCount > 0 ? `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>` : ''}
                             </div>
                         </div>
-                        <div class="orb-arrow">▶</div>
+                        <div class="orb-arrow">${isOrbLocked ? '🔒' : (isOrbCompleted ? '✅' : '▶')}</div>
                     </div>
                 `;
             }).join('');
         }
+        
+        // Aggiorna lo stato per il prossimo tile nel ciclo
+        previousTileCompleted = isTileCompleted;
 
         return `
-            <div class="tile-container ${isCompleted ? 'completed' : ''}" data-tile-id="${tile.id}">
+            <div class="tile-container ${isTileCompleted ? 'completed' : ''}">
                 <div class="tile-header ${isOpen ? 'open' : ''}">
                     <div class="tile-info">
                         <div class="tile-title">${tile.title}</div>
                         <div class="tile-meta">
                             <span class="orb-count">${tile.orbs.length} moduli</span>
-                            ${isCompleted ? '<span class="completion-badge">✅ Completato</span>' : ''}
+                            ${isTileCompleted ? '<span class="completion-badge">✅ Completato</span>' : ''}
                         </div>
                     </div>
                     <div class="tile-chevron ${isOpen ? 'rotated' : ''}">▼</div>
@@ -124,9 +125,7 @@ function renderPathway() {
                     <div class="progress-section">
                         <div class="progress-text">Completamento: <span class="progress-value">${percentage}%</span></div>
                         <div class="progress-bar-container">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${percentage}%"></div>
-                            </div>
+                            <div class="progress-fill" style="width: ${percentage}%"></div>
                         </div>
                     </div>
                     <div class="action-buttons">
@@ -148,9 +147,7 @@ function renderPathway() {
     `;
 
     pathwayView.querySelectorAll('.tile-header').forEach(tileHeader => {
-        const container = tileHeader.closest('.tile-container');
-        const tileId = container.dataset.tileId;
-
+        const tileId = tileHeader.closest('.tile-container').dataset.tileId;
         tileHeader.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleTileDropdown(tileId);
@@ -158,11 +155,13 @@ function renderPathway() {
     });
 
     pathwayView.querySelectorAll('.orb-item').forEach(orbElement => {
-        const tileId = orbElement.dataset.tileId;
-        const orbIndex = parseInt(orbElement.dataset.orbIndex);
-
+        if (orbElement.classList.contains('locked')) {
+            return;
+        }
         orbElement.addEventListener('click', (e) => {
             e.stopPropagation();
+            const tileId = orbElement.dataset.tileId;
+            const orbIndex = parseInt(orbElement.dataset.orbIndex);
             eventBus.emit('startLearningSession', { tileId, orbIndex });
         });
     });
@@ -186,117 +185,29 @@ function renderPathway() {
     showView('pathway-view');
 }
 
-function toggleTileDropdown(tileId) {
-    if (openTiles.has(tileId)) {
-        openTiles.delete(tileId);
-    } else {
-        openTiles.add(tileId);
-    }
 
-    const container = pathwayView.querySelector(`.tile-container[data-tile-id="${tileId}"]`);
-    if (container) {
-        setTimeout(() => {
-            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
-    }
-
-    updateTileDropdowns();
-}
-
-
-function updateTileDropdowns() {
-    const containers = pathwayView.querySelectorAll('.tile-container');
-
-    containers.forEach(container => {
-        const tileId = container.dataset.tileId;
-        const isOpen = openTiles.has(tileId);
-        const header = container.querySelector('.tile-header');
-        const dropdown = container.querySelector('.orbs-dropdown');
-        const chevron = container.querySelector('.tile-chevron');
-
-        if (isOpen) {
-            header.classList.add('open');
-            dropdown.classList.add('open');
-            chevron.classList.add('rotated');
-        } else {
-            header.classList.remove('open');
-            dropdown.classList.remove('open');
-            chevron.classList.remove('rotated');
-        }
-
-        if (isOpen && !dropdown.querySelector('.orb-item')) {
-            const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
-            const orbsHtml = tile.orbs.map((orb, orbIndex) => {
-                const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
-                const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
-                const totalContent = orb.contents.length;
-
-                let contentIndicators = '';
-                if (lessonCount > 0) {
-                    contentIndicators += `<span class="content-badge lesson">📖 ${lessonCount}</span>`;
-                }
-                if (flashcardCount > 0) {
-                    contentIndicators += `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>`;
-                }
-
-                return `
-                    <div class="orb-item" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
-                        <div class="orb-content">
-                            <div class="orb-title">${orb.title}</div>
-                            <div class="orb-indicators">
-                                ${contentIndicators}
-                                <span class="total-badge">${totalContent} elementi</span>
-                            </div>
-                        </div>
-                        <div class="orb-arrow">▶</div>
-                    </div>
-                `;
-            }).join('');
-
-            dropdown.querySelector('.orbs-content').innerHTML = orbsHtml;
-
-            dropdown.querySelectorAll('.orb-item').forEach(orbElement => {
-                const tileId = orbElement.dataset.tileId;
-                const orbIndex = parseInt(orbElement.dataset.orbIndex);
-
-                orbElement.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    eventBus.emit('startLearningSession', { tileId, orbIndex });
-                });
-            });
-        }
-    });
-}
-
-function renderLearningSession(tileId, orbIndex = 0) {
+function renderLearningSession(tileId, orbIndex) {
     const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
     if (!tile) {
         console.error(`Tile ${tileId} non trovato`);
         return;
     }
-
-    // --- NUOVA LOGICA: INIZIO ---
-    // Creiamo una coda di sessione con tutto il contenuto dell'orb.
-    // Usiamo structuredClone per creare una copia "profonda" e non modificare l'oggetto originale.
+    
     const initialOrb = tile.orbs[orbIndex];
-    if (!initialOrb || !initialOrb.contents) { // Se l'orb non ha contenuti, termina subito
-        eventBus.emit('updateProgress', { tileId });
+    if (!initialOrb || !initialOrb.contents || initialOrb.contents.length === 0) {
+        eventBus.emit('orbCompleted', { tileId, orbIndex });
         renderPathway();
         return;
     }
     const sessionQueue = structuredClone(initialOrb.contents);
-    // --- NUOVA LOGICA: FINE ---
 
     const renderCurrentContent = () => {
-        // --- MODIFICA: La sessione finisce quando la coda è vuota ---
         if (sessionQueue.length === 0) {
-            // L'orb è completato!
-            eventBus.emit('updateProgress', { tileId });
+            eventBus.emit('orbCompleted', { tileId, orbIndex });
             renderPathway();
             return;
         }
 
-        // Prendiamo il prossimo elemento dalla coda
         const currentContent = sessionQueue.shift(); 
         
         let contentHtml = '';
@@ -331,7 +242,6 @@ function renderLearningSession(tileId, orbIndex = 0) {
                             <button id="show-answer-btn" class="show-answer-btn">
                                 <span>Mostra risposta</span>
                             </button>
-                            
                             <button id="wrong-btn" class="wrong-btn hidden">❌ Sbagliato</button>
                             <button id="correct-btn" class="correct-btn hidden">✅ Giusto</button>
                         </div>
@@ -366,15 +276,11 @@ function renderLearningSession(tileId, orbIndex = 0) {
 
         learningView.querySelector('.back-button').addEventListener('click', renderPathway);
         
-        // --- LOGICA EVENTI AGGIORNATA ---
-
-        // Se è una lezione, il pulsante "continua" fa semplicemente avanzare
         const nextLessonBtn = learningView.querySelector('#next-lesson-btn');
         if (nextLessonBtn) {
             nextLessonBtn.addEventListener('click', renderCurrentContent);
         }
         
-        // Se è una flashcard...
         const showAnswerButton = learningView.querySelector('#show-answer-btn');
         if (showAnswerButton) {
             const answerDiv = learningView.querySelector('#flashcard-answer');
@@ -388,19 +294,106 @@ function renderLearningSession(tileId, orbIndex = 0) {
                 wrongBtn.classList.remove('hidden');
             });
             
-            // Pulsante "Giusto": passa al prossimo elemento
             correctBtn.addEventListener('click', renderCurrentContent);
 
-            // Pulsante "Sbagliato": rimette la flashcard in coda e passa al prossimo
             wrongBtn.addEventListener('click', () => {
-                sessionQueue.push(currentContent); // Rimette la flashcard in fondo alla coda!
-                renderCurrentContent(); // Passa al prossimo elemento
+                sessionQueue.push(currentContent);
+
+                renderCurrentContent();
             });
         }
     };
 
     renderCurrentContent();
     showView('learning-view');
+}
+
+function toggleTileDropdown(tileId) {
+    if (openTiles.has(tileId)) {
+        openTiles.delete(tileId);
+    } else {
+        openTiles.add(tileId);
+    }
+
+    const container = pathwayView.querySelector(`.tile-container[data-tile-id="${tileId}"]`);
+    if (container) {
+        setTimeout(() => {
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+    }
+
+    updateTileDropdowns();
+}
+
+function updateTileDropdowns() {
+    const containers = pathwayView.querySelectorAll('.tile-container');
+
+    containers.forEach(container => {
+        const tileId = container.dataset.tileId;
+        const isOpen = openTiles.has(tileId);
+        const header = container.querySelector('.tile-header');
+        const dropdown = container.querySelector('.orbs-dropdown');
+        const chevron = container.querySelector('.tile-chevron');
+
+        if (isOpen) {
+            header.classList.add('open');
+            dropdown.classList.add('open');
+            chevron.classList.add('rotated');
+        } else {
+            header.classList.remove('open');
+            dropdown.classList.remove('open');
+            chevron.classList.remove('rotated');
+        }
+
+        if (isOpen && !dropdown.querySelector('.orb-item')) {
+            const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
+            const orbsHtml = tile.orbs.map((orb, orbIndex) => {
+                const isOrbCompleted = currentProgress.completedOrbs.has(`${tile.id}-orb-${orbIndex}`);
+                // Questa logica determina se il TILE genitore è bloccato
+                // Per farlo, dobbiamo trovare l'indice del tile
+                const tileIndex = currentCourse.pathway.tiles.findIndex(t => t.id === tileId);
+                let isParentTileLocked = false;
+                if (tileIndex > 0) {
+                    const prevTile = currentCourse.pathway.tiles[tileIndex - 1];
+                    const prevTileOrbs = prevTile.orbs.length;
+                    const completedOrbsInPrevTile = prevTile.orbs.filter((o, i) => currentProgress.completedOrbs.has(`${prevTile.id}-orb-${i}`)).length;
+                    if (prevTileOrbs > 0 && completedOrbsInPrevTile < prevTileOrbs) {
+                        isParentTileLocked = true;
+                    }
+                }
+
+                const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
+                const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
+                
+                return `
+                    <div class="orb-item ${isParentTileLocked ? 'locked' : ''}" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
+                        <div class="orb-content">
+                            <div class="orb-title">${orb.title}</div>
+                            <div class="orb-indicators">
+                                ${lessonCount > 0 ? `<span class="content-badge lesson">📖 ${lessonCount}</span>` : ''}
+                                ${flashcardCount > 0 ? `<span class="content-badge flashcard">🃏 ${flashcardCount}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="orb-arrow">${isParentTileLocked ? '🔒' : (isOrbCompleted ? '✅' : '▶')}</div>
+                    </div>
+                `;
+            }).join('');
+
+            dropdown.querySelector('.orbs-content').innerHTML = orbsHtml;
+
+            dropdown.querySelectorAll('.orb-item').forEach(orbElement => {
+                if (orbElement.classList.contains('locked')) {
+                    return;
+                }
+                orbElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const tileId = orbElement.dataset.tileId;
+                    const orbIndex = parseInt(orbElement.dataset.orbIndex);
+                    eventBus.emit('startLearningSession', { tileId, orbIndex });
+                });
+            });
+        }
+    });
 }
 
 eventBus.on('progressLoaded', (data) => {
