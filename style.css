@@ -446,3 +446,20 @@ hr.divider {
     border-top: 1px solid var(--border-color);
     margin-bottom: 1.5rem;
 }
+/* ... in fondo al file ... */
+
+/* NUOVI STILI PER GLI ORB BLOCCATI */
+.orb-item.locked {
+    cursor: not-allowed;
+    background-color: #f4f6f8;
+    opacity: 0.6;
+}
+
+.orb-item.locked .orb-title {
+    color: var(--text-color-light);
+}
+
+.orb-item.locked:hover {
+    background-color: #f4f6f8; /* Disabilita l'effetto hover */
+    transform: none;
+}
