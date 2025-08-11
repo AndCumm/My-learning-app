@@ -7,15 +7,16 @@ export function renderLearningSession(course, progress, tileId, orbIndex) {
     
     const initialOrb = tile.orbs[orbIndex];
     if (!initialOrb || !initialOrb.contents || initialOrb.contents.length === 0) {
-        eventBus.emit('orbCompleted', { tileId, orbIndex });
+        eventBus.emit('orbCompleted', { tileId, orbIndex }); // Emettiamo subito se l'orb è vuoto
         return;
     }
     const sessionQueue = structuredClone(initialOrb.contents);
 
     const renderCurrentContent = () => {
         if (sessionQueue.length === 0) {
-            // L'orb è completato! Emettiamo un evento generico che verrà gestito da main.js
-            eventBus.emit('orbCompleted');
+            // --- CORREZIONE QUI ---
+            // Ora inviamo l'informazione su QUALE orb è stato completato.
+            eventBus.emit('orbCompleted', { tileId, orbIndex });
             return;
         }
         const currentContent = sessionQueue.shift(); 
@@ -60,9 +61,6 @@ export function renderLearningSession(course, progress, tileId, orbIndex) {
                 <div class="learning-progress"><div class="progress-indicator">Elementi rimasti: ${sessionQueue.length + 1}</div></div>
             </div>`;
         
-        // --- CORREZIONE QUI ---
-        // Il tasto indietro ora mostra semplicemente la vista del percorso, senza ridisegnarla.
-        // La logica è più semplice e robusta.
         learningView.querySelector('.back-button').addEventListener('click', () => showView(pathwayView));
         
         const nextLessonBtn = learningView.querySelector('#next-lesson-btn');
