@@ -90,6 +90,11 @@ function renderPathway() {
                         </div>
                     </div>
                     <div class="action-buttons">
+                            {/* NUOVO PULSANTE "CAMBIA CORSO" */}
+                        <button id="back-to-loader-btn" class="secondary-btn">
+                            <span class="btn-icon">↩️</span>
+                            <span class="btn-text">Cambia Corso</span>
+                        </button>
                         <button id="reset-progress-btn" class="reset-btn">
                             <span class="btn-icon">🗑️</span>
                             <span class="btn-text">Reset Progresso</span>
@@ -132,6 +137,13 @@ function renderPathway() {
             if (confirm('Sei sicuro di voler resettare tutto il progresso di questo corso? Questa azione non può essere annullata.')) {
                 eventBus.emit('resetProgress');
             }
+        });
+    }
+
+    const backButton = pathwayView.querySelector('#back-to-loader-btn');
+    if (backButton) {
+        backButton.addEventListener('click', () => {
+            showView('loader-view');
         });
     }
 
