@@ -37,8 +37,6 @@ eventBus.on('progressLoaded', (data) => {
 });
 
 eventBus.on('startLearningSession', ({ tileId, orbIndex }) => {
-  // --- CORREZIONE QUI ---
-  // Ora passiamo correttamente anche 'currentProgress' alla funzione che avvia la lezione.
   renderLearningSession(currentCourse, currentProgress, tileId, orbIndex);
 });
 
@@ -49,12 +47,10 @@ eventBus.on('progressUpdated', (newProgress) => {
   }
 });
 
-eventBus.on('orbCompleted', () => {
-    // Quando un orb è finito, ridisegna il percorso per aggiornare lo stato di completamento
-    if(currentCourse && currentProgress) {
-        renderPathway(currentCourse, currentProgress);
-    }
-});
+// --- CORREZIONE QUI ---
+// Ho rimosso il listener per 'orbCompleted' da questo file.
+// Ora la catena è: orbCompleted -> progress.js -> progressUpdated -> main.js.
+// Questo è il flusso corretto e più robusto.
 
 eventBus.on('parserError', msg => {
   alert('Errore nel caricamento del corso: ' + msg);
