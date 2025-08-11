@@ -4,7 +4,6 @@ import { loadProgress, saveProgress, createEmptyProgress } from './progress-core
 let currentCourseTitle = '';
 let currentProgress = null;
 
-// All'evento 'courseLoaded', carica o crea il progresso
 eventBus.on('courseLoaded', course => {
   currentCourseTitle = course.title;
   const saved = loadProgress(course.title);
@@ -12,33 +11,27 @@ eventBus.on('courseLoaded', course => {
   eventBus.emit('progressLoaded', { course, progress: currentProgress });
 });
 
-// All'evento 'updateProgress', aggiorna lo stato e salva
-eventBus.on('updateProgress', ({ tileId }) => {
+// MODIFICA: Ascoltiamo 'orbCompleted' invece di 'updateProgress'
+eventBus.on('orbCompleted', ({ tileId, orbIndex }) => {
   if (currentProgress) {
-    // FIX: Controlliamo se il tile è già completato prima di procedere
-    const wasAlreadyCompleted = currentProgress.completedTiles.has(tileId);
-    
+    const orbId = `${tileId}-orb-${orbIndex}`; // Creiamo un ID unico per l'orb
+    const wasAlreadyCompleted = currentProgress.completedOrbs.has(orbId);
+
     if (!wasAlreadyCompleted) {
-      currentProgress.completedTiles.add(tileId);
+      currentProgress.completedOrbs.add(orbId);
       saveProgress(currentCourseTitle, currentProgress);
-      console.log(`Tile completato: ${tileId}. Totale completati: ${currentProgress.completedTiles.size}`);
+      console.log(`Orb completato: ${orbId}. Totale completati: ${currentProgress.completedOrbs.size}`);
+      // Emettiamo un evento generico di aggiornamento
       eventBus.emit('progressUpdated', currentProgress);
-    } else {
-      console.log(`Tile ${tileId} già completato, salto l'aggiornamento.`);
     }
   }
 });
 
-// Gestione del reset del progresso
 eventBus.on('resetProgress', () => {
   if (currentCourseTitle) {
-    // Rimuovi dal localStorage
     const key = `progress_${currentCourseTitle}`;
     localStorage.removeItem(key);
-    
-    // Reset dello stato in memoria
     currentProgress = createEmptyProgress();
-    
     console.log(`Progresso resettato per: ${currentCourseTitle}`);
     eventBus.emit('progressUpdated', currentProgress);
   }
