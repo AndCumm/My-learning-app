@@ -54,31 +54,54 @@ function renderPathway() {
     const completedOrbsCount = progress.completedOrbs.size;
     const percentage = totalOrbs > 0 ? Math.round((completedOrbsCount / totalOrbs) * 100) : 0;
     
-    let previousTileCompleted = true; 
+    // --- NUOVA LOGICA: INIZIO ---
+    // 1. Creiamo una lista "piatta" di tutti gli orb per gestire la progressione sequenziale.
+    //    Ogni elemento della lista saprà il suo indice globale, il suo tile e il suo indice originale.
+    let globalIndex = 0;
+    const flatOrbList = [];
+    course.pathway.tiles.forEach(tile => {
+        tile.orbs.forEach((orb, orbIndex) => {
+            flatOrbList.push({
+                ...orb,
+                globalIndex: globalIndex++,
+                tileId: tile.id,
+                originalOrbIndex: orbIndex
+            });
+        });
+    });
+    // --- NUOVA LOGICA: FINE ---
 
     let tilesHtml = course.pathway.tiles.map(tile => {
+        // La logica per determinare se un TILE è completo rimane utile per la UI (mostrare il badge ✅)
         const orbsInTile = tile.orbs.length;
         const completedOrbsInTile = tile.orbs.filter((orb, i) => progress.completedOrbs.has(`${tile.id}-orb-${i}`)).length;
         const isTileCompleted = orbsInTile > 0 && completedOrbsInTile === orbsInTile;
 
-        // MODIFICA: Il primo tile (e i suoi orb) non sono mai bloccati.
-        // Gli altri sono bloccati se il tile precedente non è completo.
-        const isTileLocked = !previousTileCompleted;
         const isOpen = openTiles.has(tile.id);
+        
+        // Prendiamo solo gli orb che appartengono a questo tile dalla nostra lista piatta
+        const orbsForThisTile = flatOrbList.filter(orb => orb.tileId === tile.id);
 
-        // --- MODIFICA CHIAVE ---
-        // Generiamo SEMPRE la lista degli orb, senza più controllare se il tile è aperto.
-        // Saranno i CSS a nascondere o mostrare il contenitore.
-        const orbsHtml = tile.orbs.map((orb, orbIndex) => {
-            const isOrbCompleted = progress.completedOrbs.has(`${tile.id}-orb-${orbIndex}`);
-            // Un orb è bloccato se il suo tile è bloccato.
-            const isOrbLocked = isTileLocked;
+        const orbsHtml = orbsForThisTile.map(orb => {
+            const isOrbCompleted = progress.completedOrbs.has(`${orb.tileId}-orb-${orb.originalOrbIndex}`);
+            
+            // --- NUOVA LOGICA DI BLOCCO ---
+            // 2. Un orb è bloccato se il suo indice globale è maggiore di 0 E l'orb precedente non è completo.
+            let isOrbLocked = false;
+            if (orb.globalIndex > 0) {
+                const prevOrb = flatOrbList[orb.globalIndex - 1];
+                const prevOrbId = `${prevOrb.tileId}-orb-${prevOrb.originalOrbIndex}`;
+                if (!progress.completedOrbs.has(prevOrbId)) {
+                    isOrbLocked = true;
+                }
+            }
+            // --- NUOVA LOGICA DI BLOCCO: FINE ---
 
             const lessonCount = orb.contents.filter(c => c.type === 'lesson').length;
             const flashcardCount = orb.contents.filter(c => c.type === 'flashcard').length;
             
             return `
-                <div class="orb-item ${isOrbLocked ? 'locked' : ''}" data-tile-id="${tile.id}" data-orb-index="${orbIndex}">
+                <div class="orb-item ${isOrbLocked ? 'locked' : ''}" data-tile-id="${orb.tileId}" data-orb-index="${orb.originalOrbIndex}">
                     <div class="orb-content">
                         <div class="orb-title">${orb.title}</div>
                         <div class="orb-indicators">
@@ -90,8 +113,6 @@ function renderPathway() {
                 </div>
             `;
         }).join('');
-        
-        previousTileCompleted = isTileCompleted;
 
         return `
             <div class="tile-container ${isTileCompleted ? 'completed' : ''}" data-tile-id="${tile.id}">
@@ -182,20 +203,16 @@ function renderPathway() {
     showView('pathway-view');
 }
 
+// Le funzioni che seguono rimangono identiche alla versione precedente
 function toggleTileDropdown(tileId) {
     if (openTiles.has(tileId)) {
         openTiles.delete(tileId);
     } else {
         openTiles.add(tileId);
     }
-    // Non chiamiamo più renderPathway, ma una funzione più leggera che aggiorna solo le classi CSS
     updateTileDropdowns();
 }
 
-
-// --- MODIFICA CHIAVE ---
-// Questa funzione ora è molto più semplice. Il suo unico scopo è aggiungere o
-// rimuovere le classi CSS per mostrare/nascondere i contenuti che sono GIÀ stati disegnati.
 function updateTileDropdowns() {
     const containers = pathwayView.querySelectorAll('.tile-container');
     containers.forEach(container => {
@@ -216,7 +233,6 @@ function updateTileDropdowns() {
         }
     });
 }
-
 
 function renderLearningSession(tileId, orbIndex) {
     const tile = currentCourse.pathway.tiles.find(t => t.id === tileId);
@@ -339,7 +355,6 @@ function renderLearningSession(tileId, orbIndex) {
     showView('learning-view');
 }
 
-// Listener globali che orchestrano il tutto
 eventBus.on('progressLoaded', (data) => {
     currentCourse = data.course;
     currentProgress = data.progress;
